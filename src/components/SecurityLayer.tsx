@@ -8,7 +8,10 @@ interface SecurityLayerProps {
 
 const SecurityLayer: React.FC<SecurityLayerProps> = ({ children }) => {
   useEffect(() => {
-    // Prevent text selection (more standard approach)
+    // Prevent screenshots (works in some browsers)
+    document.documentElement.style.webkitUserSelect = 'none';
+    document.documentElement.style.mozUserSelect = 'none';
+    document.documentElement.style.msUserSelect = 'none';
     document.documentElement.style.userSelect = 'none';
     
     // Prevent context menu
@@ -21,7 +24,7 @@ const SecurityLayer: React.FC<SecurityLayerProps> = ({ children }) => {
     // Prevent keyboard shortcuts for copy, print, save
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
-        // Prevent Ctrl+C, Ctrl+X, Ctrl+P, Ctrl+S
+        // Prevent Ctrl+C, Ctrl+X
         (e.ctrlKey && (e.key === 'c' || e.key === 'x' || e.key === 'p' || e.key === 's')) ||
         // Prevent print screen
         e.key === 'PrintScreen' ||
@@ -47,32 +50,12 @@ const SecurityLayer: React.FC<SecurityLayerProps> = ({ children }) => {
       return false;
     };
     
-    // Enhanced screenshot detection
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        // When tab loses focus (potential screenshot attempt)
-        document.body.classList.add('blur-content');
-        setTimeout(() => {
-          if (document.visibilityState === 'hidden') {
-            toast.warning("Screen capture detected");
-          }
-          document.body.classList.remove('blur-content');
-        }, 300);
+    // Disable developer tools via console (limited effectiveness, but a layer of security)
+    const disableDevTools = () => {
+      if (window.devtools && window.devtools.isOpen) {
+        window.location.href = window.location.href;
       }
     };
-
-    // Add mutation observer to detect if someone is trying to modify the security settings
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.target === document.documentElement && 
-            mutation.attributeName === 'style') {
-          // Re-apply security styles if they were changed
-          document.documentElement.style.userSelect = 'none';
-        }
-      });
-    });
-    
-    observer.observe(document.documentElement, { attributes: true });
     
     // Add listeners
     document.addEventListener('contextmenu', handleContextMenu);
@@ -80,7 +63,9 @@ const SecurityLayer: React.FC<SecurityLayerProps> = ({ children }) => {
     document.addEventListener('copy', handleCopy);
     document.addEventListener('cut', handleCopy);
     document.addEventListener('dragstart', handleDragStart);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Check developer tools periodically
+    const interval = setInterval(disableDevTools, 1000);
     
     // Clean up
     return () => {
@@ -89,17 +74,11 @@ const SecurityLayer: React.FC<SecurityLayerProps> = ({ children }) => {
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('cut', handleCopy);
       document.removeEventListener('dragstart', handleDragStart);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      observer.disconnect();
+      clearInterval(interval);
     };
   }, []);
 
-  return (
-    <div className="screenshot-protection">
-      {children}
-      <div className="security-overlay"></div>
-    </div>
-  );
+  return <>{children}</>;
 };
 
 export default SecurityLayer;
